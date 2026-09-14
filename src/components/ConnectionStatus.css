@@ -1,0 +1,23 @@
+.conn-banner {
+  position: fixed;
+  z-index: 180;
+  top: calc(var(--safe-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  animation: conn-in 0.2s var(--ease);
+}
+@keyframes conn-in { from { transform: translate(-50%, -8px); opacity: 0; } }
+
+.conn-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13.5px; }
+.conn-sub { font-size: 12px; color: var(--text-subtle); }

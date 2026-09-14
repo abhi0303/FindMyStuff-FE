@@ -1,0 +1,154 @@
+/* Design tokens — minimal, built on five colours:
+     #2C2B30 charcoal · #4F4F51 graphite · #D6D6D6 silver · #F2C4CE blush · #F58F7C coral
+   Light is the base; dark overrides only the colour roles so a component never
+   needs to know which theme it is rendering in. */
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  --bg: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-sunken: #f1f1f1;
+  --bg-hover: #f3f3f3;
+  --bg-active: #e9e9e9;
+
+  --surface: #ffffff;
+  --surface-2: #f7f7f7;
+
+  --text: #2c2b30;
+  --text-muted: #4f4f51;
+  --text-subtle: #8a898e;
+  --text-inverse: #ffffff;
+
+  --border: #e8e8e8;
+  --border-strong: #d6d6d6;
+
+  /* "Thread & bead" separators: dotted threads that fade out, with coral beads. */
+  --thread: #c4c3c8;
+  --bead: #f58f7c;
+  --dots-h: radial-gradient(circle, var(--thread) 0.9px, transparent 1.4px) 0 50% / 5px 3px repeat-x;
+  --dots-v: radial-gradient(circle, var(--thread) 0.9px, transparent 1.4px) 50% 0 / 3px 5px repeat-y;
+
+  /* Primary actions are charcoal; coral is the accent, blush its soft tint. */
+  --primary: #2c2b30;
+  --primary-hover: #4f4f51;
+  --on-primary: #ffffff;
+
+  --accent: #f58f7c;
+  --accent-hover: #f27a63;
+  --accent-soft: #fcedf0;
+  --accent-soft-text: #a4473a;
+  --accent-ring: rgba(245, 143, 124, 0.3);
+  --link: #b4513f;
+
+  --avatar-bg: #f2c4ce;
+  --avatar-text: #2c2b30;
+
+  /* Glow behind empty-state illustrations. */
+  --illustration-bg: #fbe4e8;
+
+  /* Soft card behind page headers (Home, Places, Scan). */
+  --header-card-bg: #f3eef0;
+
+  --danger: #d14343;
+  --danger-soft: #fcecec;
+  --danger-soft-text: #9b2c2c;
+
+  --warning: #b7791f;
+  --warning-soft: #fbf3e4;
+  --warning-soft-text: #85570f;
+
+  --success: #2f7d55;
+  --success-soft: #e9f4ee;
+  --success-soft-text: #22603f;
+
+  --info-soft: #f3f3f4;
+  --info-soft-text: #4f4f51;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(44, 43, 48, 0.05);
+  --shadow: 0 4px 16px rgba(44, 43, 48, 0.07);
+  --shadow-lg: 0 16px 40px rgba(44, 43, 48, 0.14);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --header-h: 56px;
+  --tabbar-h: 60px;
+  --content-max: 760px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+:root[data-theme='dark'] {
+  --bg: #1f1e22;
+  --bg-elevated: #2c2b30;
+  --bg-sunken: #2a292e;
+  --bg-hover: #2a292e;
+  --bg-active: #36353b;
+
+  --surface: #26252a;
+  --surface-2: #2c2b30;
+
+  --text: #ededee;
+  --text-muted: #c2c1c6;
+  --text-subtle: #8a898e;
+  --text-inverse: #2c2b30;
+
+  --border: #333238;
+  --border-strong: #4f4f51;
+
+  --thread: #5a595f;
+  --bead: #f58f7c;
+
+  --primary: #f58f7c;
+  --primary-hover: #f7a391;
+  --on-primary: #2c2b30;
+
+  --accent: #f58f7c;
+  --accent-hover: #f7a391;
+  --accent-soft: rgba(242, 196, 206, 0.1);
+  --accent-soft-text: #f2c4ce;
+  --accent-ring: rgba(245, 143, 124, 0.35);
+  --link: #f58f7c;
+
+  --avatar-bg: rgba(242, 196, 206, 0.16);
+  --avatar-text: #f2c4ce;
+
+  --illustration-bg: rgba(242, 196, 206, 0.1);
+
+  --header-card-bg: #2a292e;
+
+  --danger: #ef7b7b;
+  --danger-soft: rgba(239, 123, 123, 0.12);
+  --danger-soft-text: #f5b5b5;
+
+  --warning: #e0b060;
+  --warning-soft: rgba(224, 176, 96, 0.12);
+  --warning-soft-text: #ebcb94;
+
+  --success: #6cc08f;
+  --success-soft: rgba(108, 192, 143, 0.12);
+  --success-soft-text: #a6d9ba;
+
+  --info-soft: rgba(255, 255, 255, 0.05);
+  --info-soft-text: #c2c1c6;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+}

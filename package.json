@@ -1,0 +1,43 @@
+{
+  "name": "findmystuff-fe",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --noEmit",
+    "api:types": "openapi-typescript openapi/api.json -o src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.59.0",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
+    "lucide-react": "^1.46.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "openapi-typescript": "^7.4.2",
+    "typescript": "~5.6.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.3.0",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}
