@@ -8,6 +8,8 @@ import { Alert, Badge, EmptyState, ErrorAlert } from '@/components/ui/Feedback';
 import { Input } from '@/components/ui/Field';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { ItemRow } from '@/components/ItemRow';
+import { CoverPhoto } from '@/components/ImageViewer';
+import { StorageThumb } from '@/components/StorageThumb';
 import { ArrowLeft, ChevronRight, QrIcon, ScanIcon, StorageIcon } from '@/components/Icons';
 import { storageTypeLabel } from '@/lib/labels';
 import { illustrations } from '@/assets/illustrations';
@@ -103,6 +105,8 @@ export default function ScanScreen() {
       <div className="stack gap-4">
         <Link to="/scan" className="back-link" replace><ArrowLeft size={15} /> Scan another</Link>
 
+        {data.coverMediaId && <CoverPhoto mediaId={data.coverMediaId} alt={data.name} />}
+
         <header className="page-header">
           <span className="icon-tile icon-tile-lg" aria-hidden><StorageIcon type={data.type} size={22} /></span>
           <div className="stack grow" style={{ minWidth: 0 }}>
@@ -120,7 +124,7 @@ export default function ScanScreen() {
             <div className="list">
               {data.children.map((child) => (
                 <Link key={child.id} to={`/places/${data.placeId}/storages/${child.id}`} className="item-row">
-                  <span className="icon-tile" aria-hidden><StorageIcon type={child.type} size={18} /></span>
+                  <StorageThumb type={child.type} coverMediaId={child.coverMediaId} />
                   <span className="item-main">
                     <span className="item-name truncate">{child.name}</span>
                     <span className="item-meta">{storageTypeLabel(child.type)}</span>

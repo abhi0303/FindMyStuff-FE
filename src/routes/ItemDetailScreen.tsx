@@ -11,6 +11,7 @@ import { AuthImage, Avatar } from '@/components/ui/AuthImage';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { MoveItemModal } from '@/components/MoveItemModal';
 import { LendItemModal } from '@/components/LendItemModal';
+import { ImageViewer } from '@/components/ImageViewer';
 import { ExpiryBadge, StatusBadge } from '@/components/ItemRow';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -40,6 +41,7 @@ export default function ItemDetailScreen() {
   const [moving, setMoving] = useState(false);
   const [lending, setLending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   if (item.isLoading) return <LoadingBlock />;
   if (item.isError) return <NotFoundBody what="thing" />;
@@ -95,11 +97,21 @@ export default function ItemDetailScreen() {
 
       {data.mediaIds.length > 0 && (
         <div className="detail-gallery">
-          {data.mediaIds.map((mediaId) => (
-            <AuthImage key={mediaId} mediaId={mediaId} alt={data.name} variant="raw" />
+          {/* Small versions here; tapping opens the full-size photo. */}
+          {data.mediaIds.map((mediaId, i) => (
+            <button
+              key={mediaId}
+              type="button"
+              className="gallery-thumb"
+              onClick={() => setViewing(i)}
+              aria-label={`Open photo ${i + 1} of ${data.mediaIds.length}`}
+            >
+              <AuthImage mediaId={mediaId} alt={data.name} />
+            </button>
           ))}
         </div>
       )}
+      <ImageViewer mediaIds={data.mediaIds} index={viewing} onIndexChange={setViewing} alt={data.name} />
 
       {/* ---- actions ---- */}
       {canEdit && (

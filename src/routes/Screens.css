@@ -243,6 +243,13 @@ button.item-row:disabled:hover { background: transparent; }
   width: 112px; height: 112px; flex-shrink: 0;
   border-radius: var(--radius); object-fit: cover; border: 1px solid var(--border);
 }
+.gallery-thumb {
+  flex-shrink: 0; padding: 0; border: 0; background: none;
+  border-radius: var(--radius); cursor: zoom-in;
+  transition: transform 0.15s var(--ease), opacity 0.15s;
+}
+.gallery-thumb:hover { opacity: 0.9; }
+.gallery-thumb:active { transform: scale(0.97); }
 .detail-rows { display: flex; flex-direction: column; margin: 0; }
 .detail-row {
   position: relative;

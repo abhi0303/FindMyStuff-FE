@@ -1,7 +1,8 @@
 import type { LucideIcon, LucideProps } from 'lucide-react';
 import {
   Archive, ArrowLeft as LucideArrowLeft, ArrowRight as LucideArrowRight, ArrowRightLeft, Backpack, Bed, Bell, Box,
-  Building2, Camera, Car, Check, ChevronDown as LucideChevronDown, ChevronRight as LucideChevronRight, ChevronsUp,
+  Building2, Camera, Car, Check, ChevronDown as LucideChevronDown, ChevronLeft as LucideChevronLeft,
+  ChevronRight as LucideChevronRight, ChevronsUp,
   CloudOff, CloudUpload,
   Clock, DoorOpen, Handshake, History, House, Inbox, KeyRound, LampDesk, Library, Link, ListFilter, Lock,
   LockKeyhole, LogOut, Luggage, MapPin, Moon, Package, Pencil, Plus, Printer, QrCode, RefreshCw, Refrigerator,
@@ -24,6 +25,7 @@ export const ScanIcon = (p: IconProps) => <ScanLine {...base} {...p} />;
 export const UserIcon = (p: IconProps) => <User {...base} {...p} />;
 export const UsersIcon = (p: IconProps) => <Users {...base} {...p} />;
 export const ChevronRight = (p: IconProps) => <LucideChevronRight {...base} {...p} />;
+export const ChevronLeft = (p: IconProps) => <LucideChevronLeft {...base} {...p} />;
 export const ChevronDown = (p: IconProps) => <LucideChevronDown {...base} {...p} />;
 export const ArrowLeft = (p: IconProps) => <LucideArrowLeft {...base} {...p} />;
 export const ArrowRight = (p: IconProps) => <LucideArrowRight {...base} {...p} />;

@@ -6,6 +6,7 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input, Select, Textarea } from './ui/Field';
 import { ImagePicker } from './ImagePicker';
+import { AuthImage } from './ui/AuthImage';
 import { StorageTreePicker, collectSubtreeIds } from './StorageTreePicker';
 import { STORAGE_TYPES, storageTypeLabel } from '@/lib/labels';
 import { Alert } from './ui/Feedback';
@@ -129,6 +130,12 @@ export function StorageFormModal({
         />
 
         <ImagePicker value={cover} onChange={setCover} max={1} label="Photo" />
+        {storage?.coverMediaId && cover.length === 0 && (
+          <div className="row gap-3">
+            <AuthImage mediaId={storage.coverMediaId} alt="" className="item-thumb" />
+            <span className="text-xs text-subtle">Current photo. Add a new one above to replace it.</span>
+          </div>
+        )}
       </div>
     </Modal>
   );

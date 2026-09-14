@@ -10,6 +10,8 @@ import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { ItemRow } from '@/components/ItemRow';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { QrCode } from '@/components/QrCode';
+import { CoverPhoto } from '@/components/ImageViewer';
+import { StorageThumb } from '@/components/StorageThumb';
 import { StorageFormModal } from '@/components/StorageFormModal';
 import { useToast } from '@/components/ui/Toast';
 import { ArrowLeft, BoxIcon, ChevronRight, EditIcon, PlusIcon, QrIcon, StorageIcon, TrashIcon } from '@/components/Icons';
@@ -76,6 +78,8 @@ export default function StorageScreen() {
         <ArrowLeft size={15} /> {data.parentId ? 'Back' : place.data?.name ?? 'Place'}
       </Link>
 
+      {data.coverMediaId && <CoverPhoto mediaId={data.coverMediaId} alt={data.name} />}
+
       <header className="stack gap-3">
         <div className="page-header">
           <span className="icon-tile icon-tile-lg" aria-hidden><StorageIcon type={data.type} size={22} /></span>
@@ -122,7 +126,7 @@ export default function StorageScreen() {
                 const node = tree.data ? findNode(tree.data, child.id) : null;
                 return (
                   <Link key={child.id} to={`/places/${placeId}/storages/${child.id}`} className="item-row">
-                    <span className="icon-tile" aria-hidden><StorageIcon type={child.type} size={18} /></span>
+                    <StorageThumb type={child.type} coverMediaId={child.coverMediaId} />
                     <span className="item-main">
                       <span className="item-name truncate">{child.name}</span>
                       <span className="item-meta">{storageTypeLabel(child.type)}</span>

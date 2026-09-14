@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/Modal';
 import { ItemRow } from '@/components/ItemRow';
 import { StorageFormModal } from '@/components/StorageFormModal';
 import { PlaceFormModal } from '@/components/PlaceFormModal';
+import { StorageThumb } from '@/components/StorageThumb';
 import { useToast } from '@/components/ui/Toast';
 import {
   ArrowLeft, BoxIcon, ChevronRight, EditIcon, HistoryIcon, PlaceIcon, PlusIcon, PrinterIcon,
@@ -351,9 +352,7 @@ function StorageNodeRow({ node, placeId, depth, expanded, onToggle }: NodeRowPro
         )}
 
         <Link to={`/places/${placeId}/storages/${node.id}`} className="trow-link">
-          <span className={root ? 'icon-tile' : 'icon-tile icon-tile-sm'} aria-hidden>
-            <StorageIcon type={node.type} size={root ? 18 : 15} />
-          </span>
+          <StorageThumb type={node.type} coverMediaId={node.coverMediaId} small={!root} />
           <span className="grow" style={{ minWidth: 0 }}>
             <span className="trow-name truncate">{node.name}</span>
             {root && <span className="trow-sub">{storageSummary(node)}</span>}
