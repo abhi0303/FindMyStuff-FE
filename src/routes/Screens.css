@@ -62,6 +62,8 @@
 .result-row { align-items: flex-start; }
 a.item-row:hover, button.item-row:hover, a.result-row:hover { background: var(--bg-hover); text-decoration: none; }
 button.item-row { width: calc(100% + 16px); border: 0; background: transparent; text-align: left; font: inherit; }
+button.item-row:disabled { opacity: 0.55; cursor: not-allowed; }
+button.item-row:disabled:hover { background: transparent; }
 
 .item-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .item-name { font-weight: 500; font-size: 14.5px; display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text); }

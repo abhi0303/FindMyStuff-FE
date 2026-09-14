@@ -7,6 +7,7 @@ import { ApiError } from '@/api/errors';
 import { forceLogout, onAuthEvent } from '@/api/client';
 import { clearTokens, getRefreshToken, hasSession, setTokens } from '@/api/tokens';
 import type { AuthResponse, Me } from '@/api/types';
+import { getOfflineSnapshot, loadOfflineUser, setMode } from '@/offline/store';
 
 type Status = 'loading' | 'authenticated' | 'anonymous' | 'unreachable';
 
@@ -18,6 +19,10 @@ interface AuthContextValue {
   requiredTermsVersion: string | null;
   /** Bootstrap failed for a reason that is not the session's fault (offline, 429, 5xx). */
   retryBootstrap: () => void;
+  /** The profile saved with this device's backup, when the server can't be reached. */
+  offlineUser: Me | null;
+  /** Open the app on the backup instead of waiting for the server. */
+  enterOffline: () => void;
   login: (dto: LoginDto) => Promise<void>;
   signup: (dto: SignupDto) => Promise<void>;
   logout: () => Promise<void>;
@@ -34,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [termsRequired, setTermsRequired] = useState(false);
   const [requiredTermsVersion, setRequiredTermsVersion] = useState<string | null>(null);
+  const [offlineUser, setOfflineUser] = useState<Me | null>(null);
 
   const applyMe = useCallback((me: Me) => {
     setUser(me);
@@ -55,12 +61,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
     setStatus('loading');
-    authApi
-      .me()
-      .then((me) => {
+
+    const bootstrap = async () => {
+      // Left in offline mode last time: open straight on the backup, no network wait.
+      if (getOfflineSnapshot().mode === 'offline') {
+        const cached = await loadOfflineUser().catch(() => null);
+        if (cancelled) return;
+        if (cached) {
+          applyMe({ ...cached, termsAcceptanceRequired: false });
+          return;
+        }
+        setMode('live', { sendQueued: false }); // nothing to show offline
+      }
+
+      try {
+        const me = await authApi.me();
         if (!cancelled) applyMe(me);
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
         if (cancelled) return;
         // Only a genuine auth failure means the session is dead. Being offline,
         // rate limited or hitting a 5xx must not throw away a valid session —
@@ -68,16 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 401) {
           clearTokens();
           setStatus('anonymous');
-        } else {
-          setStatus('unreachable');
+          return;
         }
-      });
+        setStatus('unreachable');
+        const cached = await loadOfflineUser().catch(() => null);
+        if (!cancelled) setOfflineUser(cached);
+      }
+    };
+
+    void bootstrap();
     return () => {
       cancelled = true;
     };
   }, [applyMe, bootstrapNonce]);
 
   const retryBootstrap = useCallback(() => setBootstrapNonce((n) => n + 1), []);
+
+  const enterOffline = useCallback(() => {
+    if (!offlineUser) return;
+    setMode('offline');
+    applyMe({ ...offlineUser, termsAcceptanceRequired: false });
+  }, [applyMe, offlineUser]);
 
   // The HTTP layer reports terms + forced logout globally, from any request.
   useEffect(
@@ -88,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (typeof payload === 'string') setRequiredTermsVersion(payload);
         } else if (event === 'logout') {
           setUser(null);
+          setOfflineUser(null);
           setStatus('anonymous');
           setTermsRequired(false);
           qc.clear();
@@ -141,10 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      status, user, termsRequired, requiredTermsVersion,
-      login, signup, logout, acceptTerms, refreshUser, retryBootstrap,
+      status, user, termsRequired, requiredTermsVersion, offlineUser,
+      login, signup, logout, acceptTerms, refreshUser, retryBootstrap, enterOffline,
     }),
-    [status, user, termsRequired, requiredTermsVersion, login, signup, logout, acceptTerms, refreshUser, retryBootstrap],
+    [
+      status, user, termsRequired, requiredTermsVersion, offlineUser,
+      login, signup, logout, acceptTerms, refreshUser, retryBootstrap, enterOffline,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

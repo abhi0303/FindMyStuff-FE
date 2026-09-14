@@ -70,6 +70,15 @@ function setConnectionState(next: ConnectionState) {
   connectionListeners.forEach((l) => l(next));
 }
 
+/* A request gave up because the API couldn't be reached at all. Offline mode listens to
+   this to offer the on-device backup. */
+const networkFailureListeners = new Set<() => void>();
+
+export function onNetworkFailure(listener: () => void): () => void {
+  networkFailureListeners.add(listener);
+  return () => networkFailureListeners.delete(listener);
+}
+
 /* ------------------------------------------------------------------ *
  * Retry policy
  * ------------------------------------------------------------------ */
@@ -149,7 +158,10 @@ async function withRetry<T>(
 
         const kind = classify(error);
         const lastAttempt = i === MAX_ATTEMPTS - 1;
-        if (lastAttempt || !isSafeToReplay(method, kind)) throw error;
+        if (lastAttempt || !isSafeToReplay(method, kind)) {
+          if (kind === 'network' || kind === 'gateway') networkFailureListeners.forEach((l) => l());
+          throw error;
+        }
 
         if (!announced) {
           announced = true;
@@ -225,7 +237,8 @@ async function doRefresh(): Promise<string> {
   return pair.accessToken;
 }
 
-function getFreshAccessToken(): Promise<string> {
+/** Also used by the backup worker's token bridge, so there is still only ever one refresh in flight. */
+export function getFreshAccessToken(): Promise<string> {
   refreshing ??= doRefresh().finally(() => {
     refreshing = null;
   });

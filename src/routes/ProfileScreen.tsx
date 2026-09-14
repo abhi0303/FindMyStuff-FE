@@ -12,6 +12,7 @@ import { ImagePicker } from '@/components/ImagePicker';
 import { useToast } from '@/components/ui/Toast';
 import { ChevronRight, KeyIcon, LinkIcon, LogoutIcon, ShieldIcon, UsersIcon } from '@/components/Icons';
 import { formatDate } from '@/lib/format';
+import { OfflineSection } from '@/offline/OfflineSection';
 import { toMessage } from '@/api/errors';
 import './Screens.css';
 
@@ -103,6 +104,8 @@ export default function ProfileScreen() {
           </Link>
         </nav>
       </section>
+
+      <OfflineSection />
 
       <section className="stack gap-1">
         <h2 className="section-title">Security</h2>

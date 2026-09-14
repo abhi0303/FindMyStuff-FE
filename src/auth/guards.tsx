@@ -7,7 +7,7 @@ import { RefreshIcon } from '@/components/Icons';
 import { rememberInviteCode } from './pendingInvite';
 
 export function RequireAuth() {
-  const { status, termsRequired, retryBootstrap, logout } = useAuth();
+  const { status, termsRequired, retryBootstrap, logout, offlineUser, enterOffline } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') return <LoadingBlock label="Signing you in…" />;
@@ -20,10 +20,17 @@ export function RequireAuth() {
         <EmptyState
           icon={<RefreshIcon size={24} />}
           title="Can’t reach FindMyStuff"
-          description="You’re still signed in — the server just didn’t answer. Check your connection and try again."
+          description={
+            offlineUser
+              ? 'You’re still signed in — the server just didn’t answer. Try again, or find your things in the backup on this device.'
+              : 'You’re still signed in — the server just didn’t answer. Check your connection and try again.'
+          }
           action={
             <div className="stack gap-2" style={{ width: 240 }}>
               <Button variant="primary" block onClick={retryBootstrap}>Try again</Button>
+              {offlineUser && (
+                <Button variant="secondary" block onClick={enterOffline}>Open offline backup</Button>
+              )}
               <Button variant="ghost" block onClick={logout}>Sign out</Button>
             </div>
           }

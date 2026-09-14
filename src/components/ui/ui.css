@@ -103,6 +103,8 @@
   transition: transform 0.2s var(--ease);
 }
 .switch[data-on='true'] { background: var(--accent); }
+/* Stacked switches share one divider instead of drawing two. */
+.switch-group .switch-row + .switch-row { border-top: 0; }
 .switch[data-on='true']::after { transform: translateX(16px); }
 
 /* ---------------- Card / surface ---------------- */

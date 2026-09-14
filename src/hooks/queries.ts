@@ -6,17 +6,38 @@ import {
 } from '@/api/endpoints';
 import { placeScope, qk } from '@/api/keys';
 import type { Role, StorageType } from '@/api/types';
+import {
+  localItems, localPlaces, localSearch, localStorages, localWrites, needsConnection, notInBackup,
+} from '@/offline/local';
+import { isOffline, noteLiveWrite } from '@/offline/store';
+
+/* Reads go to the live API, or to the backup on this device in offline mode. The offline
+   provider resets the query cache whenever the mode flips, so the two never mix. */
+function read<T>(offline: () => Promise<T>, live: () => Promise<T>): Promise<T> {
+  return isOffline() ? offline() : live();
+}
+
+/* A live write is copied into the backup shortly after it succeeds. In offline mode the
+   writes that can be queued are saved on the device and sent later; anything else says
+   it needs a connection. */
+function write<T>(live: () => Promise<T>, offline: (() => Promise<T>) | string): Promise<T> {
+  if (isOffline()) return typeof offline === 'string' ? needsConnection(offline) : offline();
+  return live().then((result) => {
+    noteLiveWrite();
+    return result;
+  });
+}
 
 /* ---------------- places ---------------- */
 
 export function usePlaces() {
-  return useQuery({ queryKey: qk.places, queryFn: placesApi.list });
+  return useQuery({ queryKey: qk.places, queryFn: () => read(localPlaces.list, placesApi.list) });
 }
 
 export function usePlace(placeId: string | undefined) {
   return useQuery({
     queryKey: qk.place(placeId!),
-    queryFn: () => placesApi.get(placeId!),
+    queryFn: () => read(() => localPlaces.get(placeId!), () => placesApi.get(placeId!)),
     enabled: Boolean(placeId),
   });
 }
@@ -24,7 +45,7 @@ export function usePlace(placeId: string | undefined) {
 export function useCreatePlace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: CreatePlaceDto) => placesApi.create(dto),
+    mutationFn: (dto: CreatePlaceDto) => write(() => placesApi.create(dto), 'Adding a place'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.places }),
   });
 }
@@ -32,7 +53,7 @@ export function useCreatePlace() {
 export function useUpdatePlace(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: UpdatePlaceDto) => placesApi.update(placeId, dto),
+    mutationFn: (dto: UpdatePlaceDto) => write(() => placesApi.update(placeId, dto), 'Editing a place'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.places });
       qc.invalidateQueries({ queryKey: qk.place(placeId) });
@@ -43,7 +64,7 @@ export function useUpdatePlace(placeId: string) {
 export function useDeletePlace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (placeId: string) => placesApi.remove(placeId),
+    mutationFn: (placeId: string) => write(() => placesApi.remove(placeId), 'Deleting a place'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.places }),
   });
 }
@@ -51,7 +72,7 @@ export function useDeletePlace() {
 export function useLeavePlace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (placeId: string) => placesApi.leave(placeId),
+    mutationFn: (placeId: string) => write(() => placesApi.leave(placeId), 'Leaving a place'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.places }),
   });
 }
@@ -59,7 +80,7 @@ export function useLeavePlace() {
 export function usePlaceActivity(placeId: string, page = 1) {
   return useQuery({
     queryKey: [...qk.placeActivity(placeId), page],
-    queryFn: () => placesApi.activity(placeId, { page, limit: 30 }),
+    queryFn: () => read(() => notInBackup('Activity'), () => placesApi.activity(placeId, { page, limit: 30 })),
     placeholderData: keepPreviousData,
   });
 }
@@ -67,14 +88,17 @@ export function usePlaceActivity(placeId: string, page = 1) {
 /* ---------------- members & invites ---------------- */
 
 export function usePlaceMembers(placeId: string) {
-  return useQuery({ queryKey: qk.placeMembers(placeId), queryFn: () => placesApi.members(placeId) });
+  return useQuery({
+    queryKey: qk.placeMembers(placeId),
+    queryFn: () => read(() => notInBackup('The member list'), () => placesApi.members(placeId)),
+  });
 }
 
 export function useAddMember(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
-      placesApi.addMember(placeId, userId, role),
+      write(() => placesApi.addMember(placeId, userId, role), 'Adding a member'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.placeMembers(placeId) });
       qc.invalidateQueries({ queryKey: qk.places });
@@ -86,7 +110,7 @@ export function useUpdateMemberRole(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ memberId, role }: { memberId: string; role: Role }) =>
-      placesApi.updateMember(placeId, memberId, role),
+      write(() => placesApi.updateMember(placeId, memberId, role), 'Changing a role'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.placeMembers(placeId) }),
   });
 }
@@ -94,7 +118,7 @@ export function useUpdateMemberRole(placeId: string) {
 export function useRemoveMember(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (memberId: string) => placesApi.removeMember(placeId, memberId),
+    mutationFn: (memberId: string) => write(() => placesApi.removeMember(placeId, memberId), 'Removing a member'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.placeMembers(placeId) });
       qc.invalidateQueries({ queryKey: qk.places });
@@ -105,7 +129,7 @@ export function useRemoveMember(placeId: string) {
 export function usePlaceInvites(placeId: string, enabled = true) {
   return useQuery({
     queryKey: qk.placeInvites(placeId),
-    queryFn: () => placesApi.invites(placeId),
+    queryFn: () => read(() => notInBackup('Invites'), () => placesApi.invites(placeId)),
     enabled,
   });
 }
@@ -114,7 +138,7 @@ export function useCreateInvite(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: { email?: string; phone?: string; role?: Role; expiresInDays?: number }) =>
-      placesApi.createInvite(placeId, dto),
+      write(() => placesApi.createInvite(placeId, dto), 'Creating an invite'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.placeInvites(placeId) }),
   });
 }
@@ -122,7 +146,7 @@ export function useCreateInvite(placeId: string) {
 export function useRevokeInvite(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (inviteId: string) => placesApi.revokeInvite(placeId, inviteId),
+    mutationFn: (inviteId: string) => write(() => placesApi.revokeInvite(placeId, inviteId), 'Revoking an invite'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.placeInvites(placeId) }),
   });
 }
@@ -130,7 +154,7 @@ export function useRevokeInvite(placeId: string) {
 export function useAcceptInvite() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (code: string) => placesApi.acceptInvite(code),
+    mutationFn: (code: string) => write(() => placesApi.acceptInvite(code), 'Joining a place'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.places }),
   });
 }
@@ -140,7 +164,7 @@ export function useAcceptInvite() {
 export function useStorageTree(placeId: string | undefined) {
   return useQuery({
     queryKey: qk.storageTree(placeId!),
-    queryFn: () => storagesApi.tree(placeId!),
+    queryFn: () => read(() => localStorages.tree(placeId!), () => storagesApi.tree(placeId!)),
     enabled: Boolean(placeId),
   });
 }
@@ -151,7 +175,7 @@ export function useStorageList(
 ) {
   return useQuery({
     queryKey: qk.storageList(placeId!, filters),
-    queryFn: () => storagesApi.list(placeId!, filters),
+    queryFn: () => read(() => localStorages.list(placeId!, filters), () => storagesApi.list(placeId!, filters)),
     enabled: Boolean(placeId),
   });
 }
@@ -159,7 +183,7 @@ export function useStorageList(
 export function useStorage(placeId: string | undefined, storageId: string | undefined) {
   return useQuery({
     queryKey: qk.storage(placeId!, storageId!),
-    queryFn: () => storagesApi.get(placeId!, storageId!),
+    queryFn: () => read(() => localStorages.get(placeId!, storageId!), () => storagesApi.get(placeId!, storageId!)),
     enabled: Boolean(placeId && storageId),
   });
 }
@@ -167,7 +191,7 @@ export function useStorage(placeId: string | undefined, storageId: string | unde
 export function useStorageByLabel(labelCode: string | undefined) {
   return useQuery({
     queryKey: qk.storageByLabel(labelCode!),
-    queryFn: () => storagesApi.byLabel(labelCode!),
+    queryFn: () => read(() => localStorages.byLabel(labelCode!), () => storagesApi.byLabel(labelCode!)),
     enabled: Boolean(labelCode),
     retry: false,
   });
@@ -176,7 +200,8 @@ export function useStorageByLabel(labelCode: string | undefined) {
 export function useCreateStorage(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: CreateStorageDto) => storagesApi.create(placeId, dto),
+    mutationFn: (dto: CreateStorageDto) =>
+      write(() => storagesApi.create(placeId, dto), () => localWrites.createStorage(placeId, dto)),
     onSuccess: () => qc.invalidateQueries({ queryKey: placeScope(placeId) }),
   });
 }
@@ -185,7 +210,7 @@ export function useUpdateStorage(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ storageId, dto }: { storageId: string; dto: UpdateStorageDto }) =>
-      storagesApi.update(placeId, storageId, dto),
+      write(() => storagesApi.update(placeId, storageId, dto), 'Editing a storage'),
     onSuccess: () => qc.invalidateQueries({ queryKey: placeScope(placeId) }),
   });
 }
@@ -193,7 +218,7 @@ export function useUpdateStorage(placeId: string) {
 export function useDeleteStorage(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (storageId: string) => storagesApi.remove(placeId, storageId),
+    mutationFn: (storageId: string) => write(() => storagesApi.remove(placeId, storageId), 'Deleting a storage'),
     onSuccess: () => qc.invalidateQueries({ queryKey: placeScope(placeId) }),
   });
 }
@@ -203,7 +228,7 @@ export function useDeleteStorage(placeId: string) {
 export function useItems(placeId: string | undefined, query?: ItemQuery) {
   return useQuery({
     queryKey: qk.items(placeId!, query),
-    queryFn: () => itemsApi.list(placeId!, query),
+    queryFn: () => read(() => localItems.list(placeId!, query), () => itemsApi.list(placeId!, query)),
     enabled: Boolean(placeId),
     placeholderData: keepPreviousData,
   });
@@ -212,7 +237,7 @@ export function useItems(placeId: string | undefined, query?: ItemQuery) {
 export function useItem(placeId: string | undefined, itemId: string | undefined) {
   return useQuery({
     queryKey: qk.item(placeId!, itemId!),
-    queryFn: () => itemsApi.get(placeId!, itemId!),
+    queryFn: () => read(() => localItems.get(placeId!, itemId!), () => itemsApi.get(placeId!, itemId!)),
     enabled: Boolean(placeId && itemId),
   });
 }
@@ -220,7 +245,7 @@ export function useItem(placeId: string | undefined, itemId: string | undefined)
 export function useItemHistory(placeId: string | undefined, itemId: string | undefined) {
   return useQuery({
     queryKey: qk.itemHistory(placeId!, itemId!),
-    queryFn: () => itemsApi.history(placeId!, itemId!),
+    queryFn: () => read(() => notInBackup('Move history'), () => itemsApi.history(placeId!, itemId!)),
     enabled: Boolean(placeId && itemId),
   });
 }
@@ -228,7 +253,8 @@ export function useItemHistory(placeId: string | undefined, itemId: string | und
 export function useCreateItem(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: CreateItemDto) => itemsApi.create(placeId, dto),
+    mutationFn: (dto: CreateItemDto) =>
+      write(() => itemsApi.create(placeId, dto), () => localWrites.createItem(placeId, dto)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: placeScope(placeId) });
       qc.invalidateQueries({ queryKey: qk.places });
@@ -239,7 +265,8 @@ export function useCreateItem(placeId: string) {
 export function useUpdateItem(placeId: string, itemId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (dto: UpdateItemDto) => itemsApi.update(placeId, itemId, dto),
+    mutationFn: (dto: UpdateItemDto) =>
+      write(() => itemsApi.update(placeId, itemId, dto), () => localWrites.updateItem(placeId, itemId, dto)),
     onSuccess: () => qc.invalidateQueries({ queryKey: placeScope(placeId) }),
   });
 }
@@ -247,7 +274,8 @@ export function useUpdateItem(placeId: string, itemId: string) {
 export function useDeleteItem(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (itemId: string) => itemsApi.remove(placeId, itemId),
+    mutationFn: (itemId: string) =>
+      write(() => itemsApi.remove(placeId, itemId), () => localWrites.deleteItem(placeId, itemId)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: placeScope(placeId) });
       qc.invalidateQueries({ queryKey: qk.places });
@@ -259,7 +287,10 @@ export function useMoveItem(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, toStorageId, note }: { itemId: string; toStorageId: string | null; note?: string }) =>
-      itemsApi.move(placeId, itemId, toStorageId, note),
+      write(
+        () => itemsApi.move(placeId, itemId, toStorageId, note),
+        () => localWrites.moveItem(placeId, itemId, toStorageId, note),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: placeScope(placeId) }),
   });
 }
@@ -268,7 +299,7 @@ export function useLendItem(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, ...dto }: { itemId: string; lentToName: string; dueAt?: string }) =>
-      itemsApi.lend(placeId, itemId, dto),
+      write(() => itemsApi.lend(placeId, itemId, dto), 'Lending'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: placeScope(placeId) });
       qc.invalidateQueries({ queryKey: ['attention'] });
@@ -279,7 +310,7 @@ export function useLendItem(placeId: string) {
 export function useReturnItem(placeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (itemId: string) => itemsApi.returnItem(placeId, itemId),
+    mutationFn: (itemId: string) => write(() => itemsApi.returnItem(placeId, itemId), 'Marking as returned'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: placeScope(placeId) });
       qc.invalidateQueries({ queryKey: ['attention'] });
@@ -290,7 +321,7 @@ export function useReturnItem(placeId: string) {
 export function useAttention(withinDays = 30) {
   return useQuery({
     queryKey: qk.attention(withinDays),
-    queryFn: () => itemsApi.attention(withinDays),
+    queryFn: () => read(() => localItems.attention(withinDays), () => itemsApi.attention(withinDays)),
   });
 }
 
@@ -299,7 +330,8 @@ export function useAttention(withinDays = 30) {
 export function useSearch(q: string, placeId?: string, enabled = true) {
   return useQuery({
     queryKey: qk.search(q, placeId),
-    queryFn: ({ signal }) => searchApi.search({ q, placeId, limit: 30 }, signal),
+    queryFn: ({ signal }) =>
+      read(() => localSearch({ q, placeId, limit: 30 }), () => searchApi.search({ q, placeId, limit: 30 }, signal)),
     enabled: enabled && q.trim().length >= 2,
     placeholderData: keepPreviousData,
   });
@@ -308,21 +340,27 @@ export function useSearch(q: string, placeId?: string, enabled = true) {
 /* ---------------- friends ---------------- */
 
 export function useFriends() {
-  return useQuery({ queryKey: qk.friends, queryFn: friendsApi.list });
+  return useQuery({ queryKey: qk.friends, queryFn: () => read(() => notInBackup('Friends'), friendsApi.list) });
 }
 
 export function useIncomingRequests() {
-  return useQuery({ queryKey: qk.friendRequestsIn, queryFn: friendsApi.incoming });
+  return useQuery({
+    queryKey: qk.friendRequestsIn,
+    queryFn: () => read(() => notInBackup('Friend requests'), friendsApi.incoming),
+  });
 }
 
 export function useOutgoingRequests() {
-  return useQuery({ queryKey: qk.friendRequestsOut, queryFn: friendsApi.outgoing });
+  return useQuery({
+    queryKey: qk.friendRequestsOut,
+    queryFn: () => read(() => notInBackup('Friend requests'), friendsApi.outgoing),
+  });
 }
 
 function useFriendMutation<TArgs>(fn: (args: TArgs) => Promise<unknown>) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: fn,
+    mutationFn: (args: TArgs) => write(() => fn(args), 'Managing friends'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['friends'] }),
   });
 }
@@ -340,7 +378,7 @@ export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: { name?: string; phone?: string; avatarBase64?: string }) =>
-      userApi.updateProfile(dto),
+      write(() => userApi.updateProfile(dto), 'Editing your profile'),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.me }),
   });
 }

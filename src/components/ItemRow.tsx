@@ -27,7 +27,7 @@ export function ItemRow({ item, placeId }: { item: Item; placeId: string }) {
   return (
     <Link to={`/places/${placeId}/items/${item.id}`} className="item-row">
       <AuthImage
-        mediaId={item.mediaIds[0]}
+        mediaId={item.mediaIds?.[0]}
         alt=""
         className="item-thumb"
         fallback={<span className="icon-tile" aria-hidden><BoxIcon size={18} /></span>}

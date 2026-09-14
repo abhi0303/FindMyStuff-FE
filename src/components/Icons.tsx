@@ -2,6 +2,7 @@ import type { LucideIcon, LucideProps } from 'lucide-react';
 import {
   Archive, ArrowLeft as LucideArrowLeft, ArrowRight as LucideArrowRight, ArrowRightLeft, Backpack, Bed, Bell, Box,
   Building2, Camera, Car, Check, ChevronDown as LucideChevronDown, ChevronRight as LucideChevronRight, ChevronsUp,
+  CloudOff, CloudUpload,
   Clock, DoorOpen, Handshake, History, House, Inbox, KeyRound, LampDesk, Library, Link, ListFilter, Lock,
   LockKeyhole, LogOut, Luggage, MapPin, Moon, Package, Pencil, Plus, Printer, QrCode, RefreshCw, Refrigerator,
   Rows3, ScanLine, Search, Server, ShieldCheck, Shirt, Sun, Tag, Trash2, TriangleAlert, User, Users, Vault,
@@ -51,6 +52,8 @@ export const InboxIcon = (p: IconProps) => <Inbox {...base} {...p} />;
 export const LinkIcon = (p: IconProps) => <Link {...base} {...p} />;
 export const KeyIcon = (p: IconProps) => <KeyRound {...base} {...p} />;
 export const ShieldIcon = (p: IconProps) => <ShieldCheck {...base} {...p} />;
+export const OfflineIcon = (p: IconProps) => <CloudOff {...base} {...p} />;
+export const CloudUploadIcon = (p: IconProps) => <CloudUpload {...base} {...p} />;
 
 /** Storage type → icon. Purely decorative; the label always carries the meaning. */
 const STORAGE_ICON: Record<StorageType, LucideIcon> = {

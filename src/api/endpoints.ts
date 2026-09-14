@@ -193,6 +193,31 @@ export const placesApi = {
  * Storages
  * ================================================================== */
 
+/**
+ * The things inside a storage (storage detail and QR lookup) arrive as raw rows: the first
+ * photo as `media: [{ mediaId }]` instead of `mediaIds`, and no `storage` reference. Shape
+ * them like every other item list, so the same row component can render them.
+ */
+type RawStorageItem = Omit<Item, 'mediaIds' | 'storage'> & {
+  mediaIds?: string[];
+  media?: Array<{ mediaId: string }>;
+  storage?: Item['storage'];
+};
+type RawStorageDetail = Omit<StorageDetail, 'items'> & { items?: RawStorageItem[] };
+
+function normaliseStorageDetail(raw: RawStorageDetail): StorageDetail {
+  // Everything in `items` sits directly inside this storage.
+  const here = { id: raw.id, name: raw.name, breadcrumb: raw.breadcrumb };
+  return {
+    ...raw,
+    items: (raw.items ?? []).map(({ media, ...item }) => ({
+      ...item,
+      mediaIds: item.mediaIds ?? media?.map((entry) => entry.mediaId) ?? [],
+      storage: item.storage ?? here,
+    })),
+  };
+}
+
 export const storagesApi = {
   tree: (placeId: string) => http.get<StorageNode[]>(`/places/${placeId}/storages/tree`),
 
@@ -200,7 +225,7 @@ export const storagesApi = {
     http.get<StorageListItem[]>(`/places/${placeId}/storages`, query),
 
   get: (placeId: string, storageId: string) =>
-    http.get<StorageDetail>(`/places/${placeId}/storages/${storageId}`),
+    http.get<RawStorageDetail>(`/places/${placeId}/storages/${storageId}`).then(normaliseStorageDetail),
 
   create: (placeId: string, dto: CreateStorageDto) =>
     http.post<StorageListItem>(`/places/${placeId}/storages`, dto),
@@ -214,7 +239,8 @@ export const storagesApi = {
     http.delete<StorageDeleted>(`/places/${placeId}/storages/${storageId}`),
 
   /** QR sticker lookup — searches every place you can see. */
-  byLabel: (labelCode: string) => http.get<StorageDetail>(`/storages/by-label/${labelCode}`),
+  byLabel: (labelCode: string) =>
+    http.get<RawStorageDetail>(`/storages/by-label/${labelCode}`).then(normaliseStorageDetail),
 };
 
 /* ================================================================== *

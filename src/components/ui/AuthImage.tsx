@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { requestBlob } from '@/api/client';
+import { useOffline } from '@/offline/store';
 import './ui.css';
 
 /**
@@ -12,10 +13,12 @@ import './ui.css';
  */
 const cache = new Map<string, Promise<string>>();
 
-function loadMedia(mediaId: string, variant: 'thumbnail' | 'raw'): Promise<string> {
+function loadMedia(mediaId: string, variant: 'thumbnail' | 'raw', cachedOnly: boolean): Promise<string> {
   const key = `${mediaId}:${variant}`;
   let entry = cache.get(key);
   if (!entry) {
+    // Offline mode: show what this session already loaded, and never wait on the network.
+    if (cachedOnly) return Promise.reject(new Error('Not loaded yet'));
     entry = requestBlob(`/media/${mediaId}/${variant}`)
       .then((blob) => URL.createObjectURL(blob))
       .catch((error) => {
@@ -39,18 +42,19 @@ interface AuthImageProps {
 export function AuthImage({ mediaId, alt, variant = 'thumbnail', className, style, fallback }: AuthImageProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const offline = useOffline().mode === 'offline';
 
   useEffect(() => {
     if (!mediaId) return;
     let active = true;
     setFailed(false);
-    loadMedia(mediaId, variant)
+    loadMedia(mediaId, variant, offline)
       .then((objectUrl) => active && setUrl(objectUrl))
       .catch(() => active && setFailed(true));
     return () => {
       active = false;
     };
-  }, [mediaId, variant]);
+  }, [mediaId, variant, offline]);
 
   if (!mediaId || failed) return <>{fallback ?? null}</>;
   if (!url) return <div className={`skeleton ${className ?? ''}`} style={style} aria-hidden />;

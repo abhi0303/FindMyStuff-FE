@@ -169,3 +169,19 @@
   background: var(--warning-soft); color: var(--warning-soft-text);
   font-size: 12.5px; font-weight: 500;
 }
+.offline-bar.is-mode { background: var(--accent-soft); color: var(--accent-soft-text); }
+.offline-bar button {
+  margin-left: var(--space-2); padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer;
+}
+
+/* "Offline" pill in the top bar while the app shows the on-device backup. */
+.mode-pill {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  height: 26px; padding: 0 10px; margin-right: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft); color: var(--accent-soft-text);
+  font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.mode-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.mode-pill:hover { text-decoration: none; }
