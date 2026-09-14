@@ -124,7 +124,7 @@ export default function SignupScreen() {
           <label className="checkbox-row">
             <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
             <span style={{ fontSize: 14 }}>
-              I accept the <a href="/terms" target="_blank" rel="noreferrer">terms and conditions</a>.
+              I accept the <a href={`${import.meta.env.BASE_URL}terms`} target="_blank" rel="noreferrer">terms and conditions</a>.
             </span>
           </label>
 

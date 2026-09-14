@@ -49,7 +49,8 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/* BASE_URL is '/FindMyStuff-FE/' on GitHub Pages and '/' in dev (see vite.config.ts). */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <ToastProvider>
           <AuthProvider>
             <Suspense fallback={<LoadingBlock />}>

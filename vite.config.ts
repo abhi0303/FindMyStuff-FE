@@ -1,15 +1,50 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { copyFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+
+/**
+ * GitHub Pages serves static files only, so a deep link like
+ * /FindMyStuff-FE/places/123 404s before the SPA ever boots. Pages falls back to
+ * 404.html for any unknown path, so shipping a copy of index.html under that name
+ * lets the app load and lets React Router read the real URL from window.location.
+ */
+function githubPagesSpaFallback(): Plugin {
+  let root = process.cwd();
+  let outDir = 'dist';
+
+  return {
+    name: 'github-pages-spa-fallback',
+    apply: 'build',
+    configResolved(config) {
+      root = config.root;
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      const index = resolve(root, outDir, 'index.html');
+      if (!existsSync(index)) return;
+      copyFileSync(index, resolve(root, outDir, '404.html'));
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const proxyTarget = env.API_PROXY_TARGET || 'http://localhost:3000';
 
+  /* Production builds are served from abhi0303.github.io/FindMyStuff-FE/, a
+     project page under a sub-path. Everything that follows the base — asset URLs,
+     the router's basename, the service worker's scope — moves with this one value.
+     Dev stays at the root. On a custom domain, build with BASE_PATH=/ instead. */
+  const base = env.BASE_PATH || (mode === 'production' ? '/FindMyStuff-FE/' : '/');
+
   return {
+    base,
     plugins: [
       react(),
+      githubPagesSpaFallback(),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
@@ -21,20 +56,21 @@ export default defineConfig(({ mode }) => {
           background_color: '#1f1e22',
           display: 'standalone',
           orientation: 'portrait',
-          start_url: '/',
-          scope: '/',
+          // Relative, so the installed app opens and stays inside the base path.
+          start_url: './',
+          scope: './',
           icons: [
             { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
             { src: 'icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           ],
           shortcuts: [
-            { name: 'Search', short_name: 'Search', url: '/search' },
-            { name: 'Scan a label', short_name: 'Scan', url: '/scan' },
+            { name: 'Search', short_name: 'Search', url: './search' },
+            { name: 'Scan a label', short_name: 'Scan', url: './scan' },
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+          globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
           // The API is authenticated and privacy-sensitive: never cache it in the
           // service worker. Freshness comes from React Query instead.
           navigateFallbackDenylist: [/^\/api\//],

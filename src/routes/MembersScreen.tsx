@@ -273,7 +273,8 @@ export default function MembersScreen() {
 }
 
 function inviteLink(code: string): string {
-  return `${window.location.origin}/invite/${code}`;
+  // Include the base path, or shared links break when the app lives under /FindMyStuff-FE/.
+  return `${window.location.origin}${import.meta.env.BASE_URL}invite/${code}`;
 }
 
 interface InviteModalProps {

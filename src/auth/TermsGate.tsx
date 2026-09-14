@@ -50,8 +50,8 @@ export function TermsGate() {
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
           <span style={{ fontSize: 14 }}>
             I have read and accept the{' '}
-            <a href="/terms" target="_blank" rel="noreferrer">terms and conditions</a> and{' '}
-            <a href="/privacy" target="_blank" rel="noreferrer">privacy policy</a>.
+            <a href={`${import.meta.env.BASE_URL}terms`} target="_blank" rel="noreferrer">terms and conditions</a> and{' '}
+            <a href={`${import.meta.env.BASE_URL}privacy`} target="_blank" rel="noreferrer">privacy policy</a>.
           </span>
         </label>
 
