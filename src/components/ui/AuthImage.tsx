@@ -1,34 +1,7 @@
-import { useEffect, useState } from 'react';
-import { requestBlob } from '@/api/client';
+import { useEffect, useState, type ReactNode } from 'react';
+import { MediaUnavailableError, isMediaMissing, loadMedia } from '@/api/media';
 import { useOffline } from '@/offline/store';
 import './ui.css';
-
-/**
- * Media endpoints require the Authorization header, so a plain <img src> gets a 401.
- * We fetch the bytes as a blob and hand the <img> an object URL instead.
- *
- * Object URLs are cached per media id and shared across components — the same avatar
- * rendered in ten rows costs one request. The API sends `Cache-Control: private,
- * max-age=86400`, so repeat fetches after a reload are served by the HTTP cache.
- */
-const cache = new Map<string, Promise<string>>();
-
-function loadMedia(mediaId: string, variant: 'thumbnail' | 'raw', cachedOnly: boolean): Promise<string> {
-  const key = `${mediaId}:${variant}`;
-  let entry = cache.get(key);
-  if (!entry) {
-    // Offline mode: show what this session already loaded, and never wait on the network.
-    if (cachedOnly) return Promise.reject(new Error('Not loaded yet'));
-    entry = requestBlob(`/media/${mediaId}/${variant}`)
-      .then((blob) => URL.createObjectURL(blob))
-      .catch((error) => {
-        cache.delete(key); // let a later mount retry
-        throw error;
-      });
-    cache.set(key, entry);
-  }
-  return entry;
-}
 
 interface AuthImageProps {
   mediaId: string | null | undefined;
@@ -36,27 +9,33 @@ interface AuthImageProps {
   variant?: 'thumbnail' | 'raw';
   className?: string;
   style?: React.CSSProperties;
-  fallback?: React.ReactNode;
+  /** Shown when there is no photo, or it can't be loaded right now (offline, network). */
+  fallback?: ReactNode;
+  /** Shown when the photo's file is gone for good. Defaults to `fallback`. */
+  missing?: ReactNode;
 }
 
-export function AuthImage({ mediaId, alt, variant = 'thumbnail', className, style, fallback }: AuthImageProps) {
+export function AuthImage({ mediaId, alt, variant = 'thumbnail', className, style, fallback, missing }: AuthImageProps) {
   const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<'missing' | 'error' | null>(null);
   const offline = useOffline().mode === 'offline';
+  // Known-missing photos render their placeholder straight away, with no loading flash.
+  const knownMissing = Boolean(mediaId && isMediaMissing(mediaId));
 
   useEffect(() => {
-    if (!mediaId) return;
+    if (!mediaId || isMediaMissing(mediaId)) return;
     let active = true;
-    setFailed(false);
+    setFailure(null);
     loadMedia(mediaId, variant, offline)
       .then((objectUrl) => active && setUrl(objectUrl))
-      .catch(() => active && setFailed(true));
+      .catch((error: unknown) => active && setFailure(error instanceof MediaUnavailableError ? 'missing' : 'error'));
     return () => {
       active = false;
     };
   }, [mediaId, variant, offline]);
 
-  if (!mediaId || failed) return <>{fallback ?? null}</>;
+  if (mediaId && (knownMissing || failure === 'missing')) return <>{missing ?? fallback ?? null}</>;
+  if (!mediaId || failure) return <>{fallback ?? null}</>;
   if (!url) return <div className={`skeleton ${className ?? ''}`} style={style} aria-hidden />;
 
   return <img src={url} alt={alt} className={className} style={style} loading="lazy" />;

@@ -249,6 +249,13 @@ button.item-row:disabled:hover { background: transparent; }
   transition: transform 0.15s var(--ease), opacity 0.15s;
 }
 .gallery-thumb:hover { opacity: 0.9; }
+/* A photo whose file is gone: a quiet placeholder where it used to be. */
+.gallery-missing {
+  width: 112px; height: 112px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border-radius: var(--radius); border: 1px dashed var(--border-strong);
+  color: var(--text-subtle); font-size: 11.5px;
+}
 .gallery-thumb:active { transform: scale(0.97); }
 .detail-rows { display: flex; flex-direction: column; margin: 0; }
 .detail-row {

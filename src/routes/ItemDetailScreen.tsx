@@ -15,10 +15,11 @@ import { ImageViewer } from '@/components/ImageViewer';
 import { ExpiryBadge, StatusBadge } from '@/components/ItemRow';
 import { useToast } from '@/components/ui/Toast';
 import {
-  ArrowLeft, EditIcon, HandIcon, LockIcon, MapPinIcon, MoveIcon, TrashIcon,
+  ArrowLeft, EditIcon, HandIcon, ImageOffIcon, LockIcon, MapPinIcon, MoveIcon, TrashIcon,
 } from '@/components/Icons';
+import { useMissingMedia } from '@/api/media';
 import { canEditContents, statusLabel } from '@/lib/labels';
-import { formatDate, formatDateTime, relativeTime } from '@/lib/format';
+import { formatDate, formatDateTime, pluralize, relativeTime } from '@/lib/format';
 import { toMessage } from '@/api/errors';
 import { NotFoundBody } from './NotFoundScreen';
 import './Screens.css';
@@ -42,6 +43,7 @@ export default function ItemDetailScreen() {
   const [lending, setLending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
+  const missingPhotos = useMissingMedia(item.data?.mediaIds ?? []);
 
   if (item.isLoading) return <LoadingBlock />;
   if (item.isError) return <NotFoundBody what="thing" />;
@@ -50,6 +52,8 @@ export default function ItemDetailScreen() {
   const data = item.data;
   const canEdit = canEditContents(place.data?.myRole);
   const isMine = data.ownerId === user?.id;
+  // The viewer only pages through photos that can actually be shown.
+  const viewable = data.mediaIds.filter((mediaId) => !missingPhotos.includes(mediaId));
 
   return (
     <div className="stack gap-4">
@@ -96,22 +100,48 @@ export default function ItemDetailScreen() {
       </header>
 
       {data.mediaIds.length > 0 && (
-        <div className="detail-gallery">
-          {/* Small versions here; tapping opens the full-size photo. */}
-          {data.mediaIds.map((mediaId, i) => (
-            <button
-              key={mediaId}
-              type="button"
-              className="gallery-thumb"
-              onClick={() => setViewing(i)}
-              aria-label={`Open photo ${i + 1} of ${data.mediaIds.length}`}
-            >
-              <AuthImage mediaId={mediaId} alt={data.name} />
-            </button>
-          ))}
+        <div className="stack gap-2">
+          <div className="detail-gallery">
+            {/* Small versions here; tapping opens the full-size photo. */}
+            {data.mediaIds.map((mediaId) => {
+              if (missingPhotos.includes(mediaId)) {
+                return (
+                  <span key={mediaId} className="gallery-missing" title="This photo is no longer available">
+                    <ImageOffIcon size={20} />
+                    Unavailable
+                  </span>
+                );
+              }
+              const index = viewable.indexOf(mediaId);
+              return (
+                <button
+                  key={mediaId}
+                  type="button"
+                  className="gallery-thumb"
+                  onClick={() => setViewing(index)}
+                  aria-label={`Open photo ${index + 1} of ${viewable.length}`}
+                >
+                  <AuthImage mediaId={mediaId} alt={data.name} />
+                </button>
+              );
+            })}
+          </div>
+          {missingPhotos.length > 0 && (
+            <p className="page-meta">
+              {pluralize(missingPhotos.length, 'photo')} can’t be shown any more.
+              {canEdit && (
+                <>
+                  {' '}
+                  <Link to={`/places/${placeId}/items/${itemId}/edit`}>
+                    Add {missingPhotos.length === 1 ? 'it' : 'them'} again
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
         </div>
       )}
-      <ImageViewer mediaIds={data.mediaIds} index={viewing} onIndexChange={setViewing} alt={data.name} />
+      <ImageViewer mediaIds={viewable} index={viewing} onIndexChange={setViewing} alt={data.name} />
 
       {/* ---- actions ---- */}
       {canEdit && (

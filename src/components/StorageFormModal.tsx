@@ -7,6 +7,8 @@ import { Button } from './ui/Button';
 import { Input, Select, Textarea } from './ui/Field';
 import { ImagePicker } from './ImagePicker';
 import { AuthImage } from './ui/AuthImage';
+import { ImageOffIcon } from './Icons';
+import { useMissingMedia } from '@/api/media';
 import { StorageTreePicker, collectSubtreeIds } from './StorageTreePicker';
 import { STORAGE_TYPES, storageTypeLabel } from '@/lib/labels';
 import { Alert } from './ui/Feedback';
@@ -32,6 +34,7 @@ export function StorageFormModal({
   const [pickingParent, setPickingParent] = useState(false);
 
   const tree = useStorageTree(open ? placeId : undefined);
+  const coverMissing = useMissingMedia(storage?.coverMediaId ? [storage.coverMediaId] : []).length > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -132,8 +135,17 @@ export function StorageFormModal({
         <ImagePicker value={cover} onChange={setCover} max={1} label="Photo" />
         {storage?.coverMediaId && cover.length === 0 && (
           <div className="row gap-3">
-            <AuthImage mediaId={storage.coverMediaId} alt="" className="item-thumb" />
-            <span className="text-xs text-subtle">Current photo. Add a new one above to replace it.</span>
+            <AuthImage
+              mediaId={storage.coverMediaId}
+              alt=""
+              className="item-thumb"
+              missing={<span className="icon-tile" aria-hidden><ImageOffIcon size={18} /></span>}
+            />
+            <span className="text-xs text-subtle">
+              {coverMissing
+                ? 'The current photo can’t be shown any more — add it again above.'
+                : 'Current photo. Add a new one above to replace it.'}
+            </span>
           </div>
         )}
       </div>

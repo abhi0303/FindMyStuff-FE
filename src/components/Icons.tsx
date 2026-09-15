@@ -4,7 +4,7 @@ import {
   Building2, Camera, Car, Check, ChevronDown as LucideChevronDown, ChevronLeft as LucideChevronLeft,
   ChevronRight as LucideChevronRight, ChevronsUp,
   CloudOff, CloudUpload,
-  Clock, DoorOpen, Handshake, History, House, Inbox, KeyRound, LampDesk, Library, Link, ListFilter, Lock,
+  Clock, DoorOpen, Handshake, History, House, ImageOff, Inbox, KeyRound, LampDesk, Library, Link, ListFilter, Lock,
   LockKeyhole, LogOut, Luggage, MapPin, Moon, Package, Pencil, Plus, Printer, QrCode, RefreshCw, Refrigerator,
   Rows3, ScanLine, Search, Server, ShieldCheck, Shirt, Sun, Tag, Trash2, TriangleAlert, User, Users, Vault,
   Warehouse, X,
@@ -46,6 +46,7 @@ export const TagIcon = (p: IconProps) => <Tag {...base} {...p} />;
 export const HandIcon = (p: IconProps) => <Handshake {...base} {...p} />;
 export const HistoryIcon = (p: IconProps) => <History {...base} {...p} />;
 export const CameraIcon = (p: IconProps) => <Camera {...base} {...p} />;
+export const ImageOffIcon = (p: IconProps) => <ImageOff {...base} {...p} />;
 export const XIcon = (p: IconProps) => <X {...base} {...p} />;
 export const FilterIcon = (p: IconProps) => <ListFilter {...base} {...p} />;
 export const PrinterIcon = (p: IconProps) => <Printer {...base} {...p} />;

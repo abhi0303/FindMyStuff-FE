@@ -12,8 +12,10 @@ import { TagInput } from '@/components/TagInput';
 import { ImagePicker } from '@/components/ImagePicker';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { useToast } from '@/components/ui/Toast';
-import { ArrowLeft } from '@/components/Icons';
-import { fromDateInput, toDateInput } from '@/lib/format';
+import { ArrowLeft, ImageOffIcon } from '@/components/Icons';
+import { AuthImage } from '@/components/ui/AuthImage';
+import { useMissingMedia } from '@/api/media';
+import { fromDateInput, pluralize, toDateInput } from '@/lib/format';
 import { toMessage } from '@/api/errors';
 import { NotFoundBody } from './NotFoundScreen';
 import './Screens.css';
@@ -31,6 +33,8 @@ export default function ItemFormScreen() {
   const existing = useItem(placeId, itemId);
   const createItem = useCreateItem(placeId);
   const updateItem = useUpdateItem(placeId, itemId ?? '');
+  const existingPhotos = existing.data?.mediaIds ?? [];
+  const missingExisting = useMissingMedia(existingPhotos);
 
   const [name, setName] = useState('');
   const [storageId, setStorageId] = useState<string | null>(params.get('storageId'));
@@ -228,6 +232,33 @@ export default function ItemFormScreen() {
         label="Only visible to me"
         description="Nobody else in this place will see it — not in lists, counts or search."
       />
+
+      {isEdit && existingPhotos.length > 0 && (
+        <div className="field">
+          <span className="field-label">Current photos</span>
+          <div className="detail-gallery">
+            {existingPhotos.map((mediaId) => (
+              <AuthImage
+                key={mediaId}
+                mediaId={mediaId}
+                alt=""
+                missing={
+                  <span className="gallery-missing" title="This photo is no longer available">
+                    <ImageOffIcon size={20} />
+                    Unavailable
+                  </span>
+                }
+              />
+            ))}
+          </div>
+          {missingExisting.length > 0 && (
+            <span className="field-hint">
+              {pluralize(missingExisting.length, 'photo')} can’t be shown any more — add{' '}
+              {missingExisting.length === 1 ? 'it' : 'them'} again below.
+            </span>
+          )}
+        </div>
+      )}
 
       <ImagePicker value={images} onChange={setImages} max={6} />
       {isEdit && images.length > 0 && (

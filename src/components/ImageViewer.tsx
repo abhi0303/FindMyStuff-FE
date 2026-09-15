@@ -44,7 +44,8 @@ export function ImageViewer({ mediaIds, index, onIndexChange, alt }: ImageViewer
   }, [open, close, go]);
 
   if (!open) return null;
-  const current = mediaIds[index];
+  // A photo can turn out missing while the viewer is open, shortening the list.
+  const current = mediaIds[Math.min(index, count - 1)];
 
   return createPortal(
     <div
@@ -79,6 +80,7 @@ export function ImageViewer({ mediaIds, index, onIndexChange, alt }: ImageViewer
         alt={alt}
         variant="raw"
         className="viewer-img"
+        missing={<span className="viewer-missing">This photo is no longer available.</span>}
         fallback={
           <AuthImage
             mediaId={current}

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Item, ItemStatus } from '@/api/types';
+import { useMissingMedia } from '@/api/media';
 import { AuthImage } from './ui/AuthImage';
 import { Badge } from './ui/Feedback';
 import { Breadcrumb } from './Breadcrumb';
@@ -24,10 +25,14 @@ export function ExpiryBadge({ expiresAt }: { expiresAt: string | null }) {
 }
 
 export function ItemRow({ item, placeId }: { item: Item; placeId: string }) {
+  // Skip photos whose file is gone, so a re-attached photo still shows in the list.
+  const missingPhotos = useMissingMedia(item.mediaIds ?? []);
+  const photo = item.mediaIds?.find((mediaId) => !missingPhotos.includes(mediaId));
+
   return (
     <Link to={`/places/${placeId}/items/${item.id}`} className="item-row">
       <AuthImage
-        mediaId={item.mediaIds?.[0]}
+        mediaId={photo}
         alt=""
         className="item-thumb"
         fallback={<span className="icon-tile" aria-hidden><BoxIcon size={18} /></span>}
