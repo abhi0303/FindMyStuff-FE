@@ -80,6 +80,42 @@ export function onNetworkFailure(listener: () => void): () => void {
 }
 
 /* ------------------------------------------------------------------ *
+ * Slow requests
+ *
+ * A sleeping instance accepts the connection and then just holds it, so nothing fails and
+ * no retry is announced for a full attempt timeout. Waiting is measured directly instead:
+ * if anything is still in flight after a few seconds, the server is asleep and the app can
+ * show the on-device backup rather than a spinner.
+ * ------------------------------------------------------------------ */
+
+const SLOW_REQUEST_MS = 4000;
+
+const slowRequestListeners = new Set<() => void>();
+let inFlight = 0;
+let slowTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function onSlowRequest(listener: () => void): () => void {
+  slowRequestListeners.add(listener);
+  return () => slowRequestListeners.delete(listener);
+}
+
+function requestStarted(): void {
+  inFlight += 1;
+  slowTimer ??= setTimeout(() => {
+    slowTimer = null;
+    if (inFlight > 0) slowRequestListeners.forEach((l) => l());
+  }, SLOW_REQUEST_MS);
+}
+
+function requestFinished(): void {
+  inFlight = Math.max(0, inFlight - 1);
+  if (inFlight === 0 && slowTimer) {
+    clearTimeout(slowTimer);
+    slowTimer = null;
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Retry policy
  * ------------------------------------------------------------------ */
 
@@ -341,7 +377,10 @@ async function fetchOnce(
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
 
-  return withRetry<T>(
+  // Only API calls count towards "the server is slow"; a slow photo download does not.
+  requestStarted();
+  try {
+    return await withRetry<T>(
     method,
     async () => {
       const token = options.anonymous ? null : getAccessToken();
@@ -379,9 +418,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       } catch {
         return undefined as T;
       }
-    },
-    classifyFailure,
-  );
+      },
+      classifyFailure,
+    );
+  } finally {
+    requestFinished();
+  }
 }
 
 /** Authenticated binary fetch — media endpoints need the bearer header. */

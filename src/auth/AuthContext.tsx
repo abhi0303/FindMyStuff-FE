@@ -4,7 +4,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi, type LoginDto, type SignupDto } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import { forceLogout, onAuthEvent, onConnectionChange } from '@/api/client';
+import { forceLogout, onAuthEvent } from '@/api/client';
 import { clearTokens, getRefreshToken, hasSession, setTokens } from '@/api/tokens';
 import type { AuthResponse, Me } from '@/api/types';
 import { getOfflineSnapshot, loadOfflineUser, noteServerReachable, setMode } from '@/offline/store';
@@ -66,23 +66,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let settled = false;
     setStatus('loading');
 
-    /* The API sleeps when idle and can take a minute to wake. Rather than hold the app on a
-       spinner, open on this device's saved copy and let the reconnect banner offer the
-       latest once the server answers. */
-    let slowTimer = 0;
-    const stopWatchingConnection = onConnectionChange((state) => {
-      if (settled || state.status !== 'retrying') return;
-      window.clearTimeout(slowTimer);
-      const waited = Date.now() - (state.since ?? Date.now());
-      slowTimer = window.setTimeout(() => {
-        void (async () => {
-          const cached = await loadOfflineUser().catch(() => null);
-          if (!cached || settled || cancelled) return;
-          setMode('offline', { reason: 'auto' });
-          applyMe({ ...cached, termsAcceptanceRequired: false });
-        })();
-      }, Math.max(0, SERVER_SLOW_AFTER_MS - waited));
-    });
+    /* The API sleeps when idle and can take a minute to wake — and a sleeping instance holds
+       the connection open rather than failing, so nothing is "retrying" meanwhile. Measure the
+       wait directly: after a few seconds, open on this device's saved copy and let the
+       reconnect banner offer the latest once the server answers. */
+    const slowTimer = window.setTimeout(() => {
+      void (async () => {
+        const cached = await loadOfflineUser().catch(() => null);
+        if (!cached || settled || cancelled) return;
+        setMode('offline', { reason: 'auto' });
+        applyMe({ ...cached, termsAcceptanceRequired: false });
+      })();
+    }, SERVER_SLOW_AFTER_MS);
 
     const bootstrap = async () => {
       // Left in offline mode last time: open straight on the backup, no network wait.
@@ -123,7 +118,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       window.clearTimeout(slowTimer);
-      stopWatchingConnection();
     };
   }, [applyMe, bootstrapNonce]);
 

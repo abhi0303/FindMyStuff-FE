@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/auth/AuthContext';
-import { onConnectionChange, onNetworkFailure } from '@/api/client';
+import { onNetworkFailure, onSlowRequest } from '@/api/client';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { pluralize } from '@/lib/format';
 import { getOfflineSnapshot, onOfflineEvent, setMode, startBackup, useOffline } from './store';
 
-/**
- * A request still unanswered after this long means the server is asleep (it spins down when
- * idle and takes 30-60s to wake). Rather than hold everyone on a spinner, show the backup.
- */
-const SERVER_SLOW_AFTER_MS = 4000;
 /** After "Later" on the reconnect banner, wait before offering again. */
 const OFFER_AGAIN_AFTER_MS = 3 * 60_000;
 
@@ -73,21 +68,15 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   // Watch for the server being slow or unreachable while we are reading it live.
   useEffect(() => {
     if (status !== 'authenticated' || mode !== 'live') return;
-    let timer = 0;
     const onBrowserOffline = () => showSavedCopy();
     window.addEventListener('offline', onBrowserOffline);
     const stopFailures = onNetworkFailure(showSavedCopy);
-    const stopRetries = onConnectionChange((state) => {
-      window.clearTimeout(timer);
-      if (state.status !== 'retrying') return;
-      const waited = Date.now() - (state.since ?? Date.now());
-      timer = window.setTimeout(showSavedCopy, Math.max(0, SERVER_SLOW_AFTER_MS - waited));
-    });
+    // Fires while a request is still unanswered — a sleeping server never "fails".
+    const stopSlow = onSlowRequest(showSavedCopy);
     return () => {
-      window.clearTimeout(timer);
       window.removeEventListener('offline', onBrowserOffline);
       stopFailures();
-      stopRetries();
+      stopSlow();
     };
   }, [status, mode, showSavedCopy]);
 

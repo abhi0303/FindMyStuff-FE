@@ -7,7 +7,7 @@ import { takeInviteCode, peekInviteCode } from '@/auth/pendingInvite';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { Alert, ErrorAlert } from '@/components/ui/Feedback';
-import { BoxIcon } from '@/components/Icons';
+import { BrandMark } from '@/components/BrandMark';
 import { useToast } from '@/components/ui/Toast';
 import './Auth.css';
 
@@ -86,7 +86,7 @@ export default function SignupScreen() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark"><BoxIcon size={26} /></span>
+          <span className="brand-mark"><BrandMark size={26} /></span>
           <h1>Create your account</h1>
           <p>Keep track of where everything lives.</p>
         </div>

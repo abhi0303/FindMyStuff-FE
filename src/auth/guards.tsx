@@ -1,16 +1,44 @@
+import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { TermsGate } from './TermsGate';
-import { Button, LoadingBlock } from '@/components/ui/Button';
+import { Button, LoadingBlock, Spinner } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Feedback';
 import { RefreshIcon } from '@/components/Icons';
 import { rememberInviteCode } from './pendingInvite';
+
+/**
+ * Shown while `/auth/me` is in flight. With a backup on the device the app switches to it
+ * after a few seconds; with nothing to show, at least say why the wait is happening.
+ */
+function SigningIn() {
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="center-fill" role="status">
+      <div className="stack gap-3" style={{ alignItems: 'center', textAlign: 'center' }}>
+        <Spinner size={26} />
+        <span className="text-sm text-muted">Signing you in…</span>
+        {slow && (
+          <span className="text-xs text-subtle" style={{ maxWidth: '32ch' }}>
+            The server sleeps when it’s idle and can take up to a minute to wake up.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function RequireAuth() {
   const { status, termsRequired, retryBootstrap, logout, offlineUser, enterOffline } = useAuth();
   const location = useLocation();
 
-  if (status === 'loading') return <LoadingBlock label="Signing you in…" />;
+  if (status === 'loading') return <SigningIn />;
 
   // The session is intact but the server could not be reached (offline, rate
   // limited, 5xx). Offer a retry rather than signing the user out.

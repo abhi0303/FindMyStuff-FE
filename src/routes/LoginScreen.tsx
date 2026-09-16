@@ -6,7 +6,7 @@ import { ApiError } from '@/api/errors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { ErrorAlert } from '@/components/ui/Feedback';
-import { BoxIcon } from '@/components/Icons';
+import { BrandMark } from '@/components/BrandMark';
 import './Auth.css';
 
 export default function LoginScreen() {
@@ -42,7 +42,7 @@ export default function LoginScreen() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark"><BoxIcon size={26} /></span>
+          <span className="brand-mark"><BrandMark size={26} /></span>
           <h1>Welcome back</h1>
           <p>Sign in to find your things.</p>
         </div>

@@ -5,6 +5,7 @@ import { useOnline } from '@/hooks/useOnline';
 import {
   BellIcon, BoxIcon, HomeIcon, MoonIcon, ScanIcon, SearchIcon, SunIcon, UserIcon,
 } from '@/components/Icons';
+import { BrandMark } from '@/components/BrandMark';
 import { setMode, useOffline } from '@/offline/store';
 import { Spinner } from '@/components/ui/Button';
 import { relativeTime } from '@/lib/format';
@@ -37,7 +38,7 @@ export function AppShell() {
     <div className="shell">
       <nav className="sidebar" aria-label="Main">
         <NavLink to="/" className="brand">
-          <span className="brand-mark"><BoxIcon size={16} /></span>
+          <span className="brand-mark"><BrandMark size={17} /></span>
           FindMyStuff
         </NavLink>
 
@@ -65,7 +66,7 @@ export function AppShell() {
       <div className="shell-main">
         <header className="appbar">
           <NavLink to="/" className="brand">
-            <span className="brand-mark"><BoxIcon size={16} /></span>
+            <span className="brand-mark"><BrandMark size={17} /></span>
             FindMyStuff
           </NavLink>
           <div className="grow" />
