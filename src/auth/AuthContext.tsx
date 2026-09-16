@@ -4,10 +4,13 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi, type LoginDto, type SignupDto } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
-import { forceLogout, onAuthEvent } from '@/api/client';
+import { forceLogout, onAuthEvent, onConnectionChange } from '@/api/client';
 import { clearTokens, getRefreshToken, hasSession, setTokens } from '@/api/tokens';
 import type { AuthResponse, Me } from '@/api/types';
-import { getOfflineSnapshot, loadOfflineUser, setMode } from '@/offline/store';
+import { getOfflineSnapshot, loadOfflineUser, noteServerReachable, setMode } from '@/offline/store';
+
+/** Matches the offline provider: a server this slow is asleep, not broken. */
+const SERVER_SLOW_AFTER_MS = 4000;
 
 type Status = 'loading' | 'authenticated' | 'anonymous' | 'unreachable';
 
@@ -60,7 +63,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
+    let settled = false;
     setStatus('loading');
+
+    /* The API sleeps when idle and can take a minute to wake. Rather than hold the app on a
+       spinner, open on this device's saved copy and let the reconnect banner offer the
+       latest once the server answers. */
+    let slowTimer = 0;
+    const stopWatchingConnection = onConnectionChange((state) => {
+      if (settled || state.status !== 'retrying') return;
+      window.clearTimeout(slowTimer);
+      const waited = Date.now() - (state.since ?? Date.now());
+      slowTimer = window.setTimeout(() => {
+        void (async () => {
+          const cached = await loadOfflineUser().catch(() => null);
+          if (!cached || settled || cancelled) return;
+          setMode('offline', { reason: 'auto' });
+          applyMe({ ...cached, termsAcceptanceRequired: false });
+        })();
+      }, Math.max(0, SERVER_SLOW_AFTER_MS - waited));
+    });
 
     const bootstrap = async () => {
       // Left in offline mode last time: open straight on the backup, no network wait.
@@ -76,8 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const me = await authApi.me();
+        settled = true;
+        // Awake: if we opened on the saved copy meanwhile, offer the latest data.
+        noteServerReachable();
         if (!cancelled) applyMe(me);
       } catch (error) {
+        settled = true;
         if (cancelled) return;
         // Only a genuine auth failure means the session is dead. Being offline,
         // rate limited or hitting a 5xx must not throw away a valid session —
@@ -96,6 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void bootstrap();
     return () => {
       cancelled = true;
+      window.clearTimeout(slowTimer);
+      stopWatchingConnection();
     };
   }, [applyMe, bootstrapNonce]);
 

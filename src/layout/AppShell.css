@@ -170,6 +170,12 @@
   font-size: 12.5px; font-weight: 500;
 }
 .offline-bar.is-mode { background: var(--accent-soft); color: var(--accent-soft-text); }
+/* Waiting out a slow server: informative, not a warning. */
+.offline-bar.is-syncing {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+  background: var(--info-soft); color: var(--info-soft-text);
+}
+.offline-bar.is-syncing .spinner { border-color: color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; }
 .offline-bar button {
   margin-left: var(--space-2); padding: 0; border: 0; background: none;
   color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer;

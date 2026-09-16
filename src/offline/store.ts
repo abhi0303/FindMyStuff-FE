@@ -10,15 +10,23 @@ import { backupExists, deleteBackup, getMeta, openBackup } from './db';
 import { EMPTY_STATUS, type BackupStatus, type FromWorker, type ToWorker } from './types';
 
 export type DataMode = 'live' | 'offline';
+/**
+ * Why we're reading the backup: the user chose to ('manual'), or the server was too slow
+ * and we fell back to it ('auto'). Only the manual case is presented as "offline mode".
+ */
+export type OfflineReason = 'manual' | 'auto';
 
 const MODE_KEY = 'fms.dataMode';
+const REASON_KEY = 'fms.dataModeReason';
 const AUTO_KEY = 'fms.autoBackup';
 const USER_KEY = 'fms.backupUser';
 
 /** Background backup cadence while the app is open and visible. */
 const AUTO_SYNC_EVERY_MS = 5 * 60_000;
-/** How often offline mode checks whether the server is reachable again. */
+/** How often to check whether the server is reachable again. */
 const PROBE_EVERY_MS = 30_000;
+/** Faster while only waiting out a slow server — that wait should end as soon as possible. */
+const PROBE_WAITING_MS = 10_000;
 /** A burst of live edits becomes one background sync. */
 const WRITE_DEBOUNCE_MS = 2500;
 
@@ -45,13 +53,27 @@ function write(key: string, value: string | null): void {
 
 export interface OfflineSnapshot {
   mode: DataMode;
+  reason: OfflineReason;
   /** "Always back up in the background". On unless the user turned it off. */
   autoBackup: boolean;
   status: BackupStatus;
 }
 
+function initialMode(): { mode: DataMode; reason: OfflineReason } {
+  const offline = read(MODE_KEY) === 'offline';
+  const reason: OfflineReason = read(REASON_KEY) === 'auto' ? 'auto' : 'manual';
+  // Falling back to the backup because the server was slow is never remembered across a
+  // reload: always give the server a fresh chance first.
+  if (offline && reason === 'auto') {
+    write(MODE_KEY, null);
+    write(REASON_KEY, null);
+    return { mode: 'live', reason: 'manual' };
+  }
+  return { mode: offline ? 'offline' : 'live', reason };
+}
+
 let snapshot: OfflineSnapshot = {
-  mode: read(MODE_KEY) === 'offline' ? 'offline' : 'live',
+  ...initialMode(),
   autoBackup: read(AUTO_KEY) !== 'off',
   status: EMPTY_STATUS,
 };
@@ -70,6 +92,8 @@ function subscribe(listener: () => void): () => void {
 
 export const getOfflineSnapshot = (): OfflineSnapshot => snapshot;
 export const isOffline = (): boolean => snapshot.mode === 'offline';
+/** Reading the backup only because the server is slow, not because the user chose to. */
+export const isWaitingForServer = (): boolean => snapshot.mode === 'offline' && snapshot.reason === 'auto';
 
 export function useOffline(): OfflineSnapshot {
   return useSyncExternalStore(subscribe, getOfflineSnapshot);
@@ -81,7 +105,7 @@ export function useOffline(): OfflineSnapshot {
 
 export type OfflineEvent =
   | { type: 'changed' }
-  | { type: 'mode'; mode: DataMode }
+  | { type: 'mode'; mode: DataMode; reason: OfflineReason }
   | { type: 'reachable'; reachable: boolean }
   | { type: 'replayed'; synced: number; failed: number };
 
@@ -178,9 +202,15 @@ export async function startBackup(me: Me): Promise<void> {
   autoTimer = window.setInterval(() => {
     if (shouldAutoSync()) requestSync();
   }, AUTO_SYNC_EVERY_MS);
+  let probeTick = 0;
   probeTimer = window.setInterval(() => {
-    if (isOffline() && visible()) send({ type: 'probe' });
-  }, PROBE_EVERY_MS);
+    if (!isOffline() || !visible()) return;
+    probeTick += 1;
+    // Waiting out a slow server: check every tick. Deliberate offline mode: less often.
+    if (isWaitingForServer() || probeTick % (PROBE_EVERY_MS / PROBE_WAITING_MS) === 0) {
+      send({ type: 'probe' });
+    }
+  }, PROBE_WAITING_MS);
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisibility);
 
@@ -204,6 +234,11 @@ export function stopBackup(): void {
 /* ------------------------------------------------------------------ *
  * Actions
  * ------------------------------------------------------------------ */
+
+/** A live request just succeeded — the server is awake, so offer the latest data right away. */
+export function noteServerReachable(): void {
+  if (isOffline()) emit({ type: 'reachable', reachable: true });
+}
 
 export function requestSync(full = false): void {
   send({ type: 'sync', full });
@@ -230,11 +265,13 @@ export function noteOfflineWrite(): void {
   send(navigator.onLine ? { type: 'replay' } : { type: 'status' });
 }
 
-export function setMode(mode: DataMode, options: { sendQueued?: boolean } = {}): void {
-  if (mode === snapshot.mode) return;
+export function setMode(mode: DataMode, options: { sendQueued?: boolean; reason?: OfflineReason } = {}): void {
+  const reason: OfflineReason = mode === 'offline' ? options.reason ?? 'manual' : 'manual';
+  if (mode === snapshot.mode && reason === snapshot.reason) return;
   write(MODE_KEY, mode === 'offline' ? 'offline' : null);
-  update({ mode });
-  emit({ type: 'mode', mode });
+  write(REASON_KEY, mode === 'offline' && reason === 'auto' ? 'auto' : null);
+  update({ mode, reason });
+  emit({ type: 'mode', mode, reason });
   // Back to live: send what was queued offline, then catch the backup up.
   if (mode === 'live' && options.sendQueued !== false) send({ type: 'replay', thenSync: true });
 }

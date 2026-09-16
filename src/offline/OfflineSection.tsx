@@ -12,7 +12,7 @@ import '@/routes/Screens.css';
 
 /** Profile → Offline mode: the switch, background backup, manual backup and removal. */
 export function OfflineSection() {
-  const { mode, autoBackup, status } = useOffline();
+  const { mode, reason, autoBackup, status } = useOffline();
   const toast = useToast();
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -48,9 +48,11 @@ export function OfflineSection() {
           }}
           label="Use offline mode"
           description={
-            offline
-              ? 'Showing the backup. Things you add are sent when you go live.'
-              : 'Browse the backup instead of the server.'
+            offline && reason === 'auto'
+              ? 'Showing your saved copy while the server wakes up. It switches back on its own.'
+              : offline
+                ? 'Showing the backup. Things you add are sent when you go live.'
+                : 'Browse the backup instead of the server.'
           }
         />
         <Switch

@@ -6,6 +6,7 @@ import {
   BellIcon, BoxIcon, HomeIcon, MoonIcon, ScanIcon, SearchIcon, SunIcon, UserIcon,
 } from '@/components/Icons';
 import { setMode, useOffline } from '@/offline/store';
+import { Spinner } from '@/components/ui/Button';
 import { relativeTime } from '@/lib/format';
 import './AppShell.css';
 
@@ -21,8 +22,10 @@ export function AppShell() {
   const { theme, toggle } = useTheme();
   const online = useOnline();
   const location = useLocation();
-  const { mode, status: backup } = useOffline();
-  const offlineMode = mode === 'offline';
+  const { mode, reason, status: backup } = useOffline();
+  const waitingForServer = mode === 'offline' && reason === 'auto';
+  // The pill marks deliberate offline mode only — waiting out a slow server is not that.
+  const offlineMode = mode === 'offline' && reason === 'manual';
 
   // The badge is the whole point of the attention endpoint — surface it in the chrome.
   const { data: attention } = useAttention(30);
@@ -80,7 +83,13 @@ export function AppShell() {
           </NavLink>
         </header>
 
-        {offlineMode ? (
+        {waitingForServer ? (
+          // Not "offline mode": the app is simply showing the saved copy until the server answers.
+          <div className="offline-bar is-syncing">
+            <Spinner size={12} />
+            Showing your saved copy while we reconnect…
+          </div>
+        ) : offlineMode ? (
           <div className="offline-bar is-mode">
             Offline mode{backup.lastSyncAt ? ` · backup saved ${relativeTime(backup.lastSyncAt)}` : ''}
             <button type="button" onClick={() => setMode('live')}>Go live</button>

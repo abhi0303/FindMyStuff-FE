@@ -3,35 +3,30 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/auth/AuthContext';
 import { onConnectionChange, onNetworkFailure } from '@/api/client';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
-import { pluralize, relativeTime } from '@/lib/format';
+import { pluralize } from '@/lib/format';
 import { getOfflineSnapshot, onOfflineEvent, setMode, startBackup, useOffline } from './store';
 
-/** A request still retrying after this long counts as "can't reach the server". */
-const TROUBLE_AFTER_MS = 6000;
-/** After "Keep trying", don't ask again for a while. */
-const ASK_OFFLINE_AGAIN_AFTER_MS = 2 * 60_000;
-/** After "Stay offline", don't ask again for a while. */
-const ASK_LIVE_AGAIN_AFTER_MS = 5 * 60_000;
-
-type Prompt = 'go-offline' | 'go-live' | null;
+/**
+ * A request still unanswered after this long means the server is asleep (it spins down when
+ * idle and takes 30-60s to wake). Rather than hold everyone on a spinner, show the backup.
+ */
+const SERVER_SLOW_AFTER_MS = 4000;
+/** After "Later" on the reconnect banner, wait before offering again. */
+const OFFER_AGAIN_AFTER_MS = 3 * 60_000;
 
 /**
- * Runs the backup for the signed-in account and handles the switch between live and
- * offline: it asks to go offline when the server can't be reached, and to go live again
- * once it can.
+ * Runs the backup for the signed-in account, falls back to the saved copy while the server
+ * is waking up, and offers the latest data once it answers.
  */
 export function OfflineProvider({ children }: { children: ReactNode }) {
   const { status, user, refreshUser } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const { mode, status: backup } = useOffline();
+  const { mode, reason, status: backup } = useOffline();
 
-  const [prompt, setPrompt] = useState<Prompt>(null);
-  const snoozed = useRef({ offline: 0, live: 0 });
-  /** In offline mode: has the server been unreachable? Only then offer to go live. */
-  const lostConnection = useRef(false);
+  const [offerLatest, setOfferLatest] = useState(false);
+  const snoozedUntil = useRef(0);
 
   useEffect(() => {
     if (status === 'authenticated' && user) void startBackup(user);
@@ -47,23 +42,19 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
             if (getOfflineSnapshot().mode === 'offline') void qc.invalidateQueries();
             break;
           case 'mode':
-            setPrompt(null);
+            setOfferLatest(false);
             // Drop everything cached from the other source, so live and backup data never mix.
             void qc.resetQueries();
-            if (event.mode === 'live') {
-              lostConnection.current = false;
-              refreshUser().catch(() => undefined);
-            }
+            if (event.mode === 'live') refreshUser().catch(() => undefined);
             break;
           case 'reachable':
-            if (getOfflineSnapshot().mode !== 'offline') break;
-            if (!event.reachable) lostConnection.current = true;
-            else if (lostConnection.current && Date.now() > snoozed.current.live) setPrompt('go-live');
+            if (!event.reachable || getOfflineSnapshot().mode !== 'offline') break;
+            if (Date.now() > snoozedUntil.current) setOfferLatest(true);
             break;
           case 'replayed':
-            if (event.synced) toast.success(`${pluralize(event.synced, 'offline change')} saved to the server.`);
+            if (event.synced) toast.success(`${pluralize(event.synced, 'change')} saved to the server.`);
             if (event.failed) {
-              toast.error(`${pluralize(event.failed, 'offline change')} couldn’t be saved. See You → Offline mode.`);
+              toast.error(`${pluralize(event.failed, 'change')} couldn’t be saved. See You → Offline mode.`);
             }
             break;
         }
@@ -71,25 +62,26 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     [qc, refreshUser, toast],
   );
 
-  const askToGoOffline = useCallback(() => {
+  /** Show the saved copy instead of making the user wait for a sleeping server. */
+  const showSavedCopy = useCallback(() => {
     const snap = getOfflineSnapshot();
     if (snap.mode === 'offline' || !snap.status.hasBackup) return;
-    if (Date.now() < snoozed.current.offline) return;
-    setPrompt((current) => current ?? 'go-offline');
-  }, []);
+    setMode('offline', { reason: 'auto' });
+    toast.push('The server is slow to answer — showing your saved copy meanwhile.');
+  }, [toast]);
 
-  // Live mode: watch for the connection dropping.
+  // Watch for the server being slow or unreachable while we are reading it live.
   useEffect(() => {
     if (status !== 'authenticated' || mode !== 'live') return;
     let timer = 0;
-    const onBrowserOffline = () => askToGoOffline();
+    const onBrowserOffline = () => showSavedCopy();
     window.addEventListener('offline', onBrowserOffline);
-    const stopFailures = onNetworkFailure(askToGoOffline);
+    const stopFailures = onNetworkFailure(showSavedCopy);
     const stopRetries = onConnectionChange((state) => {
       window.clearTimeout(timer);
       if (state.status !== 'retrying') return;
       const waited = Date.now() - (state.since ?? Date.now());
-      timer = window.setTimeout(askToGoOffline, Math.max(0, TROUBLE_AFTER_MS - waited));
+      timer = window.setTimeout(showSavedCopy, Math.max(0, SERVER_SLOW_AFTER_MS - waited));
     });
     return () => {
       window.clearTimeout(timer);
@@ -97,73 +89,42 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       stopFailures();
       stopRetries();
     };
-  }, [status, mode, askToGoOffline]);
+  }, [status, mode, showSavedCopy]);
 
-  // Opened without a connection, as soon as we know a backup exists.
+  // Opened with no connection at all, once we know a backup exists.
   useEffect(() => {
-    if (status === 'authenticated' && backup.hasBackup && !navigator.onLine) askToGoOffline();
-  }, [status, backup.hasBackup, askToGoOffline]);
+    if (status === 'authenticated' && backup.hasBackup && !navigator.onLine) showSavedCopy();
+  }, [status, backup.hasBackup, showSavedCopy]);
 
-  const goOffline = () => {
-    lostConnection.current = true;
-    setPrompt(null);
-    setMode('offline');
-    toast.push('Offline mode — showing the backup on this device.');
-  };
-
-  const keepTrying = () => {
-    snoozed.current.offline = Date.now() + ASK_OFFLINE_AGAIN_AFTER_MS;
-    setPrompt(null);
-  };
-
-  const goLive = () => {
-    setPrompt(null);
-    setMode('live');
-  };
-
-  const stayOffline = () => {
-    snoozed.current.live = Date.now() + ASK_LIVE_AGAIN_AFTER_MS;
-    setPrompt(null);
-  };
+  const waiting = mode === 'offline' && reason === 'auto';
 
   return (
     <>
       {children}
 
-      <Modal
-        open={prompt === 'go-offline'}
-        onClose={keepTrying}
-        title="Can’t reach the server"
-        footer={
-          <>
-            <Button variant="secondary" onClick={keepTrying}>Keep trying</Button>
-            <Button variant="primary" onClick={goOffline}>Use offline mode</Button>
-          </>
-        }
-      >
-        <p className="text-muted" style={{ fontSize: 14 }}>
-          Your connection seems to be down. Switch to offline mode to find your things in the backup on this
-          device{backup.lastSyncAt ? `, saved ${relativeTime(backup.lastSyncAt)}` : ''}. Anything you add
-          is sent once you’re back online.
-        </p>
-      </Modal>
-
-      <Modal
-        open={prompt === 'go-live'}
-        onClose={stayOffline}
-        title="You’re back online"
-        footer={
-          <>
-            <Button variant="secondary" onClick={stayOffline}>Stay offline</Button>
-            <Button variant="primary" onClick={goLive}>Go live</Button>
-          </>
-        }
-      >
-        <p className="text-muted" style={{ fontSize: 14 }}>
-          The server can be reached again. Switch to live mode to see the latest
-          {backup.pending > 0 ? ` and send ${pluralize(backup.pending, 'change')} you made offline` : ''}.
-        </p>
-      </Modal>
+      {offerLatest && mode === 'offline' && (
+        <div className="update-banner" role="status">
+          <span className="grow">
+            {waiting
+              ? 'The server is ready — the latest data can be loaded.'
+              : 'The server can be reached again.'}
+            {backup.pending > 0 && ` ${pluralize(backup.pending, 'change')} waiting to send.`}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              snoozedUntil.current = Date.now() + OFFER_AGAIN_AFTER_MS;
+              setOfferLatest(false);
+            }}
+          >
+            Later
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => setMode('live')}>
+            {waiting ? 'Show latest' : 'Go live'}
+          </Button>
+        </div>
+      )}
     </>
   );
 }
